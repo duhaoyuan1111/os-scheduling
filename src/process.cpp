@@ -109,6 +109,9 @@ void Process::setState(State new_state, uint64_t current_time)
         // finish CPU, go to the next IO
         current_burst++;
         burst_start_time = current_time;
+    } else if (state == State::Ready && new_state == State::Running) {
+        burst_start_time = current_time;
+        // don't current_burst++
     }
 
     state = new_state;
@@ -138,7 +141,8 @@ void Process::updateProcess(uint64_t current_time)
 
 void Process::updateBurstTime(int burst_idx, uint32_t new_time)
 {
-    burst_times[burst_idx] = new_time;
+    // burst_times[burst_idx] = new_time;
+    burst_times[burst_idx] -= new_time;
 }
 
 int Process::getIndexBurstTime() const
@@ -149,6 +153,11 @@ int Process::getIndexBurstTime() const
 uint32_t Process::getBurstTimeOfGivenIndex(int index)
 {
     return burst_times[index];
+}
+
+uint16_t Process::getNumBursts() const
+{
+    return num_bursts;
 }
 
 

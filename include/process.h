@@ -52,6 +52,7 @@ public:
     void updateBurstTime(int burst_idx, uint32_t new_time);
     int getIndexBurstTime() const;
     uint32_t getBurstTimeOfGivenIndex(int index);
+    uint16_t getNumBursts() const;
 };
 
 // Comparators: used in std::list sort() method

@@ -195,11 +195,63 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
 {
     // Work to be done by each core idependent of the other cores
     // Repeat until all processes in terminated state:
+    
     while (!(shared_data->all_terminated)) {
-        { //   - *Get process at front of ready queue
-            const std::lock_guard<std::mutex> lock(shared_data->mutex);
-            shared_data->ready_queue.pop_front();
+        Process *p;
+        if (!shared_data->ready_queue.empty()) {
+            { //   - *Get process at front of ready queue
+                const std::lock_guard<std::mutex> lock(shared_data->mutex);
+                p = shared_data->ready_queue.front();
+                shared_data->ready_queue.pop_front();
+            }
         }
+        // when has a process
+        while (p != NULL) {
+            // p is running now.
+            p->setState(Process::State::Running, currentTime());
+            // running for 50 ms per loop
+            usleep(50000);
+            //   - Simulate the processes running until one of the following:
+            //     - CPU burst time has elapsed
+            if (currentTime() - p->getBurstStartTime() >= p->getBurstTimeOfGivenIndex(p->getIndexBurstTime())) {
+                //  - Place the process back in the appropriate queue
+                //    - I/O queue if CPU burst finished (and process not finished) -- no actual queue, simply set state to IO
+                //    - Terminated if CPU burst finished and no more bursts remain -- no actual queue, simply set state to Terminated
+                if (p->getIndexBurstTime() + 1 < p->getNumBursts()) {
+                    // Has more I/O burst, Running -> IO
+                    p->setState(Process::State::IO, currentTime());
+                    // current process is over
+                    break;
+                } else if (p->getIndexBurstTime() + 1 == p->getNumBursts()) {
+                    // No more burst, Running -> Terminated
+                    p->setState(Process::State::Terminated, currentTime());
+                    // current process is over
+                    break;
+                }
+            } else if (p->isInterrupted()) {
+                //  - Interrupted (RR time slice has elapsed or process preempted by higher priority process)
+                //  - *Ready queue if interrupted (be sure to modify the CPU burst time to now reflect the remaining time)
+                {
+                    const std::lock_guard<std::mutex> lock(shared_data->mutex);
+                    if (shared_data->algorithm == ScheduleAlgorithm::RR) {
+                        p->interruptHandled();
+                        shared_data->ready_queue.push_back(p);
+                        // modify the CPU burst time to now reflect the remaining time
+                        p->updateBurstTime(p->getIndexBurstTime(), 50);
+                        break;
+                    } else if (shared_data->algorithm == ScheduleAlgorithm::PP) {
+                        p->interruptHandled();
+                        shared_data->ready_queue.push_back(p);
+                        // modify the CPU burst time to now reflect the remaining time
+                        p->updateBurstTime(p->getIndexBurstTime(), 50);
+                        break;
+                    }
+                }
+
+            }
+        }
+        //  - Wait context switching time
+        usleep(shared_data->context_switch);
     }
     
     //   - Simulate the processes running until one of the following:
