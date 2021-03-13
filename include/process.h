@@ -50,6 +50,8 @@ public:
 
     void updateProcess(uint64_t current_time);
     void updateBurstTime(int burst_idx, uint32_t new_time);
+    int getIndexBurstTime() const;
+    uint32_t getBurstTimeOfGivenIndex(int index);
 };
 
 // Comparators: used in std::list sort() method
@@ -59,6 +61,10 @@ struct SjfComparator {
 };
 
 struct PpComparator {
+    bool operator ()(const Process *p1, const Process *p2);
+};
+
+struct PrunComparator {
     bool operator ()(const Process *p1, const Process *p2);
 };
 

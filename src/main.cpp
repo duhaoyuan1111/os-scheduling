@@ -77,20 +77,90 @@ int main(int argc, char **argv)
 
     // Main thread work goes here
     int num_lines = 0;
+    
     while (!(shared_data->all_terminated))
     {
         // Clear output from previous iteration
         clearOutput(num_lines);
 
         // Do the following:
-        //   - Get current time
-        //   - *Check if any processes need to move from NotStarted to Ready (based on elapsed time), and if so put that process in the ready queue
-        //   - *Check if any processes have finished their I/O burst, and if so put that process back in the ready queue
-        //   - *Check if any running process need to be interrupted (RR time slice expires or newly ready process has higher priority)
-        //   - *Sort the ready queue (if needed - based on scheduling algorithm)
-        //   - Determine if all processes are in the terminated state
-        //   - * = accesses shared data (ready queue), so be sure to use proper synchronization
-
+        //- * = accesses shared data (ready queue), so be sure to use proper synchronization
+        //- Get current time
+        uint64_t curTime = currentTime();
+        uint64_t timeInterval = curTime - start;
+        {
+            const std::lock_guard<std::mutex> lock(shared_data->mutex);
+            std::list<Process*> running_queue;
+            // Need a running queue, for comparing priority
+            for (i = 0; i < config->num_processes; i++) {
+                if (processes[i]->getState() == Process::State::Running) {
+                    running_queue.push_back(processes[i]);
+                }
+            }
+            // sort from lowest priority (4) to highest (0)
+            running_queue.sort(PrunComparator());
+            for (i = 0; i < config->num_processes; i++) {
+                //- *Check if any processes need to move from NotStarted to Ready (based on elapsed time), and if so put that process in the ready queue
+                if (timeInterval >= processes[i]->getStartTime() && processes[i]->getState() == Process::State::NotStarted) {
+                    processes[i]->setState(Process::State::Ready, curTime);
+                    shared_data->ready_queue.push_back(processes[i]);
+                }
+                //- *Check if any processes have finished their I/O burst, and if so put that process back in the ready queue
+                if (processes[i]->getState() == Process::State::IO && curTime - processes[i]->getBurstStartTime() >= processes[i]->getBurstTimeOfGivenIndex(processes[i]->getIndexBurstTime())) {
+                    processes[i]->setState(Process::State::Ready, curTime);
+                    shared_data->ready_queue.push_back(processes[i]);
+                }
+                //- *Check if any running process need to be interrupted (RR time slice expires)
+                if (processes[i]->getState() == Process::State::Running && shared_data->algorithm == ScheduleAlgorithm::RR) {
+                    // RR
+                    if (shared_data->time_slice <= curTime - processes[i]->getBurstStartTime()) {
+                        processes[i]->interrupt();
+                    }
+                }
+            }
+            //- *Sort the ready queue (if needed - based on scheduling algorithm)
+            if (shared_data->algorithm == ScheduleAlgorithm::PP) {
+                // ready queue is from highest priority to lowest
+                shared_data->ready_queue.sort(PpComparator());
+            } else if (shared_data->algorithm == ScheduleAlgorithm::SJF) {
+                shared_data->ready_queue.sort(SjfComparator());
+            }
+            //- *Check if any running process need to be interrupted (newly ready process has higher priority)
+            if (shared_data->algorithm == ScheduleAlgorithm::PP) {
+                // PP
+                std::list<Process*>::iterator iterRun = running_queue.begin();
+                std::list<Process*>::iterator iterRea = shared_data->ready_queue.begin();
+                while (iterRun != running_queue.end() && iterRea != shared_data->ready_queue.end()) {
+                    if ((*iterRun)->getPriority() > (*iterRea)->getPriority()) {
+                        // compare the "highest priority one in ready queue" to the "lowest one in running queue"
+                        // As long as it cannot be interrupted, there is no need to keep comparing.
+                        // e.g. running [4, 3, 2, 1, 0]
+                        //      ready   [2, 3, 4, 4, 4]
+                        // first loop: 4 -> interrupt, because 2 has higher priority (they would be swapped in the below function)
+                        // second loop: 3 == 3, then we know that everything on the right side won't be interrupted
+                        (*iterRun)->interrupt();
+                        iterRun++;
+                        iterRea++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        //- Determine if all processes are in the terminated state
+        int counter = 0;
+        for (i = 0; i < config->num_processes; i++) {
+            if (processes[i]->getState() == Process::State::Terminated) {
+                counter++;
+            }
+        }
+        if (counter == config->num_processes) {
+            shared_data->all_terminated = true;
+        }
+        
+        // update all time vars here?? Using updateProcess()
+        
+        
         // output process status table
         num_lines = printProcessOutput(processes, shared_data->mutex);
 
@@ -125,7 +195,13 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
 {
     // Work to be done by each core idependent of the other cores
     // Repeat until all processes in terminated state:
-    //   - *Get process at front of ready queue
+    while (!(shared_data->all_terminated)) {
+        { //   - *Get process at front of ready queue
+            const std::lock_guard<std::mutex> lock(shared_data->mutex);
+            shared_data->ready_queue.pop_front();
+        }
+    }
+    
     //   - Simulate the processes running until one of the following:
     //     - CPU burst time has elapsed
     //     - Interrupted (RR time slice has elapsed or process preempted by higher priority process)

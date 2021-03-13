@@ -101,7 +101,16 @@ void Process::setState(State new_state, uint64_t current_time)
     if (state == State::NotStarted && new_state == State::Ready)
     {
         launch_time = current_time;
+        current_burst = 0;
+    } else if (state == State::IO && new_state == State::Ready) {
+        // finish IO, go to the next CPU
+        current_burst++;
+    } else if (state == State::Running && new_state == State::IO) {
+        // finish CPU, go to the next IO
+        current_burst++;
+        burst_start_time = current_time;
     }
+
     state = new_state;
 }
 
@@ -124,11 +133,22 @@ void Process::updateProcess(uint64_t current_time)
 {
     // use `current_time` to update turnaround time, wait time, burst times, 
     // cpu time, and remaining time
+    
 }
 
 void Process::updateBurstTime(int burst_idx, uint32_t new_time)
 {
     burst_times[burst_idx] = new_time;
+}
+
+int Process::getIndexBurstTime() const
+{
+    return current_burst;
+}
+
+uint32_t Process::getBurstTimeOfGivenIndex(int index)
+{
+    return burst_times[index];
 }
 
 
@@ -138,13 +158,30 @@ void Process::updateBurstTime(int burst_idx, uint32_t new_time)
 // SJF - comparator for sorting read queue based on shortest remaining CPU time
 bool SjfComparator::operator ()(const Process *p1, const Process *p2)
 {
-    // your code here!
-    return false; // change this!
+    if (p1->getRemainingTime() > p2->getRemainingTime()) {
+        return true;
+    } else {
+        return false;
+    }
+    
 }
 
 // PP - comparator for sorting read queue based on priority
 bool PpComparator::operator ()(const Process *p1, const Process *p2)
 {
-    // your code here!
-    return false; // change this!
+    if (p1->getPriority() > p2->getPriority()) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// comparator for sorting running queue basd on Priority
+bool PrunComparator::operator ()(const Process *p1, const Process *p2)
+{
+    if (p1->getPriority() < p2->getPriority()) {
+        return true;
+    } else {
+        return false;
+    }
 }
