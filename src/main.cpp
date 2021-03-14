@@ -64,8 +64,9 @@ int main(int argc, char **argv)
             shared_data->ready_queue.push_back(p);
         }
     }
-
+    
     // Free configuration data from memory
+    int num_processes = config->num_processes;
     deleteConfig(config);
 
     // Launch 1 scheduling thread per cpu core
@@ -92,14 +93,14 @@ int main(int argc, char **argv)
             const std::lock_guard<std::mutex> lock(shared_data->mutex);
             std::list<Process*> running_queue;
             // Need a running queue, for comparing priority
-            for (i = 0; i < config->num_processes; i++) {
+            for (i = 0; i < num_processes; i++) {
                 if (processes[i]->getState() == Process::State::Running) {
                     running_queue.push_back(processes[i]);
                 }
             }
             // sort from lowest priority (4) to highest (0)
             running_queue.sort(PrunComparator());
-            for (i = 0; i < config->num_processes; i++) {
+            for (i = 0; i < num_processes; i++) {
                 //- *Check if any processes need to move from NotStarted to Ready (based on elapsed time), and if so put that process in the ready queue
                 if (timeInterval >= processes[i]->getStartTime() && processes[i]->getState() == Process::State::NotStarted) {
                     processes[i]->setState(Process::State::Ready, curTime);
@@ -151,12 +152,12 @@ int main(int argc, char **argv)
         }
         //- Determine if all processes are in the terminated state
         int counter = 0;
-        for (i = 0; i < config->num_processes; i++) {
+        for (i = 0; i < num_processes; i++) {
             if (processes[i]->getState() == Process::State::Terminated) {
                 counter++;
             }
         }
-        if (counter == config->num_processes) {
+        if (counter == num_processes) {
             shared_data->all_terminated = true;
         }
         
