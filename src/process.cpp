@@ -25,6 +25,7 @@ Process::Process(ProcessDetails details, uint64_t current_time)
     wait_time = 0;
     cpu_time = 0;
     remain_time = 0;
+    start_waiting_time = 0;
     for (i = 0; i < num_bursts; i+=2)
     {
         remain_time += burst_times[i];
@@ -101,10 +102,12 @@ void Process::setState(State new_state, uint64_t current_time)
     if (state == State::NotStarted && new_state == State::Ready)
     {
         launch_time = current_time;
+        wait_time = current_time;
         current_burst = 0;
     } else if (state == State::IO && new_state == State::Ready) {
         // finish IO, go to the next CPU
         current_burst++;
+        wait_time = current_time;
     } else if (state == State::Running && new_state == State::IO) {
         // finish CPU, go to the next IO
         current_burst++;
@@ -134,8 +137,18 @@ void Process::interruptHandled()
 
 void Process::updateProcess(uint64_t current_time)
 {
-    // use `current_time` to update turnaround time, wait time, burst times, 
+    // use `current_time` to update turnaround time, wait time, burst times (handled in another method below), 
     // cpu time, and remaining time
+    if (state != State::Terminated) { // when hasn't been terminated
+        turn_time = current_time - launch_time;
+    }
+    if (state == State::Ready) { // it's about to leave ready state
+        wait_time += current_time - start_waiting_time;
+    }
+    if (state == State::Running) { // it's about to leave running state
+        cpu_time += current_time - burst_start_time;
+        remain_time -= current_time - burst_start_time;
+    }
     
 }
 
@@ -160,6 +173,10 @@ uint16_t Process::getNumBursts() const
     return num_bursts;
 }
 
+void Process::setStartWaitingTime(uint64_t current_time)
+{
+    start_waiting_time = current_time;
+}
 
 // Comparator methods: used in std::list sort() method
 // No comparator needed for FCFS or RR (ready queue never sorted)

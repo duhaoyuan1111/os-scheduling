@@ -104,11 +104,13 @@ int main(int argc, char **argv)
                 if (timeInterval >= processes[i]->getStartTime() && processes[i]->getState() == Process::State::NotStarted) {
                     processes[i]->setState(Process::State::Ready, curTime);
                     shared_data->ready_queue.push_back(processes[i]);
+                    processes[i]->setStartWaitingTime(currentTime());
                 }
                 //- *Check if any processes have finished their I/O burst, and if so put that process back in the ready queue
                 if (processes[i]->getState() == Process::State::IO && curTime - processes[i]->getBurstStartTime() >= processes[i]->getBurstTimeOfGivenIndex(processes[i]->getIndexBurstTime())) {
                     processes[i]->setState(Process::State::Ready, curTime);
                     shared_data->ready_queue.push_back(processes[i]);
+                    processes[i]->setStartWaitingTime(currentTime());
                 }
                 //- *Check if any running process need to be interrupted (RR time slice expires)
                 if (processes[i]->getState() == Process::State::Running && shared_data->algorithm == ScheduleAlgorithm::RR) {
@@ -158,9 +160,6 @@ int main(int argc, char **argv)
             shared_data->all_terminated = true;
         }
         
-        // update all time vars here?? Using updateProcess()
-        
-        
         // output process status table
         num_lines = printProcessOutput(processes, shared_data->mutex);
 
@@ -203,11 +202,14 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                 const std::lock_guard<std::mutex> lock(shared_data->mutex);
                 p = shared_data->ready_queue.front();
                 shared_data->ready_queue.pop_front();
+                p->updateProcess(currentTime()); // wait_time updated
             }
         }
         // when has a process
+        
         while (p != NULL) {
             // p is running now.
+            p->setCpuCore(core_id);
             p->setState(Process::State::Running, currentTime());
             // running for 50 ms per loop
             usleep(50000);
@@ -219,12 +221,16 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                 //    - Terminated if CPU burst finished and no more bursts remain -- no actual queue, simply set state to Terminated
                 if (p->getIndexBurstTime() + 1 < p->getNumBursts()) {
                     // Has more I/O burst, Running -> IO
+                    p->updateProcess(currentTime());// update cpu_time && remain_time
                     p->setState(Process::State::IO, currentTime());
+                    p->setCpuCore(-1);
                     // current process is over
                     break;
                 } else if (p->getIndexBurstTime() + 1 == p->getNumBursts()) {
                     // No more burst, Running -> Terminated
+                    p->updateProcess(currentTime());// update cpu_time && remain_time
                     p->setState(Process::State::Terminated, currentTime());
+                    p->setCpuCore(-1);
                     // current process is over
                     break;
                 }
@@ -235,15 +241,21 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                     const std::lock_guard<std::mutex> lock(shared_data->mutex);
                     if (shared_data->algorithm == ScheduleAlgorithm::RR) {
                         p->interruptHandled();
+                        p->updateProcess(currentTime());// update cpu_time && remain_time
+                        p->setState(Process::State::Ready, currentTime());
                         shared_data->ready_queue.push_back(p);
                         // modify the CPU burst time to now reflect the remaining time
                         p->updateBurstTime(p->getIndexBurstTime(), 50);
+                        p->setCpuCore(-1);
                         break;
                     } else if (shared_data->algorithm == ScheduleAlgorithm::PP) {
                         p->interruptHandled();
+                        p->updateProcess(currentTime());// update cpu_time && remain_time
+                        p->setState(Process::State::Ready, currentTime());
                         shared_data->ready_queue.push_back(p);
                         // modify the CPU burst time to now reflect the remaining time
                         p->updateBurstTime(p->getIndexBurstTime(), 50);
+                        p->setCpuCore(-1);
                         break;
                     }
                 }
