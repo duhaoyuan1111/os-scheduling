@@ -62,6 +62,7 @@ int main(int argc, char **argv)
         if (p->getState() == Process::State::Ready)
         {
             shared_data->ready_queue.push_back(p);
+            p->setStartWaitingTime(currentTime());
         }
     }
     
@@ -203,7 +204,7 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                 const std::lock_guard<std::mutex> lock(shared_data->mutex);
                 p = shared_data->ready_queue.front();
                 shared_data->ready_queue.pop_front();
-                p->updateProcess(currentTime()); // wait_time updated
+                p->updateProcess(currentTime()); // update wait_time
             }
         }
         // when has a process
@@ -245,6 +246,7 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                         p->updateProcess(currentTime());// update cpu_time && remain_time
                         p->setState(Process::State::Ready, currentTime());
                         shared_data->ready_queue.push_back(p);
+                        p->setStartWaitingTime(currentTime());
                         // modify the CPU burst time to now reflect the remaining time
                         p->updateBurstTime(p->getIndexBurstTime(), 50);
                         p->setCpuCore(-1);
@@ -254,6 +256,7 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                         p->updateProcess(currentTime());// update cpu_time && remain_time
                         p->setState(Process::State::Ready, currentTime());
                         shared_data->ready_queue.push_back(p);
+                        p->setStartWaitingTime(currentTime());
                         // modify the CPU burst time to now reflect the remaining time
                         p->updateBurstTime(p->getIndexBurstTime(), 50);
                         p->setCpuCore(-1);

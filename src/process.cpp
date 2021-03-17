@@ -102,12 +102,10 @@ void Process::setState(State new_state, uint64_t current_time)
     if (state == State::NotStarted && new_state == State::Ready)
     {
         launch_time = current_time;
-        wait_time = current_time;
         current_burst = 0;
     } else if (state == State::IO && new_state == State::Ready) {
         // finish IO, go to the next CPU
         current_burst++;
-        wait_time = current_time;
     } else if (state == State::Running && new_state == State::IO) {
         // finish CPU, go to the next IO
         current_burst++;
