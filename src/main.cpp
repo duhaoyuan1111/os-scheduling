@@ -101,6 +101,7 @@ int main(int argc, char **argv)
             }
             // sort from lowest priority (4) to highest (0)
             running_queue.sort(PrunComparator());
+            
             for (i = 0; i < num_processes; i++) {
                 //- *Check if any processes need to move from NotStarted to Ready (based on elapsed time), and if so put that process in the ready queue
                 if (timeInterval >= processes[i]->getStartTime() && processes[i]->getState() == Process::State::NotStarted) {
@@ -229,11 +230,11 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                     p->updateProcess(curTime);// update cpu_time && remain_time
                     p->setState(Process::State::IO, curTime);
                     p->setCpuCore(-1);
-                    std::cout << p->getPid() << " ---- "<< processStateToString(p->getState()) << std::endl;
+                    std::cout << p->getPid() << " ---- " << processStateToString(p->getState()) << std::endl;
                     
                     // current process is over
                     break;
-                } else if (p->getIndexBurstTime() + 1 == p->getNumBursts()) {
+                } else if (p->getIndexBurstTime() + 1 >= p->getNumBursts()) {
                     // No more burst, Running -> Terminated
                     p->updateProcess(curTime);// update cpu_time && remain_time
                     p->setState(Process::State::Terminated, curTime);
