@@ -8,6 +8,7 @@ Process::Process(ProcessDetails details, uint64_t current_time)
     start_time = details.start_time;
     num_bursts = details.num_bursts;
     current_burst = 0;
+    time_slice = 0;
     burst_times = new uint32_t[num_bursts];
     for (i = 0; i < num_bursts; i++)
     {
@@ -157,6 +158,10 @@ void Process::updateBurstTime(int burst_idx, uint32_t new_time)
 {
     // burst_times[burst_idx] = new_time;
     burst_times[burst_idx] -= new_time;
+    if (burst_times[burst_idx] < 0) {
+        burst_times[burst_idx] = 0;
+    }
+
 }
 
 int Process::getIndexBurstTime() const
@@ -177,6 +182,16 @@ uint16_t Process::getNumBursts() const
 void Process::setStartWaitingTime(uint64_t current_time)
 {
     start_waiting_time = current_time;
+}
+
+void Process::setTimeSlice(uint32_t time_slice)
+{
+    time_slice = time_slice;
+}
+
+uint32_t Process::getTimeSlice() const
+{
+    return time_slice;
 }
 
 // Comparator methods: used in std::list sort() method
