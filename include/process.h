@@ -25,6 +25,7 @@ private:
     int32_t remain_time;        // CPU time remaining until terminated
     uint64_t launch_time;       // actual time in ms (since epoch) that process was 'launched'
     uint64_t start_waiting_time;// time when start waiting in the ready queue
+    uint32_t time_slice;        // time slice for RR algo
     // you are welcome to add other private data fields here if you so choose
     // Yes, I need to add more, even though I don't want to :/
 public:
@@ -55,6 +56,8 @@ public:
     uint32_t getBurstTimeOfGivenIndex(int index);
     uint16_t getNumBursts() const;
     void setStartWaitingTime(uint64_t current_time);
+    void setTimeSlice(uint32_t time_slice);
+    uint32_t getTimeSlice() const;
 };
 
 // Comparators: used in std::list sort() method
