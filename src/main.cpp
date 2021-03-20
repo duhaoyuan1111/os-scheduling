@@ -57,7 +57,8 @@ int main(int argc, char **argv)
     for (i = 0; i < config->num_processes; i++)
     {
         Process *p = new Process(config->processes[i], start);
-        p->setTimeSlice(config->time_slice);
+        p->setTimeSlice(shared_data->time_slice);
+        std::cout << p->getTimeSlice() << "-------\n" << std::endl;
         processes.push_back(p);
         // If process should be launched immediately, add to ready queue
         if (p->getState() == Process::State::Ready)
@@ -84,7 +85,7 @@ int main(int argc, char **argv)
     while (!(shared_data->all_terminated))
     {
         // Clear output from previous iteration
-        clearOutput(num_lines);
+        //clearOutput(num_lines);
 
         // Do the following:
         //- * = accesses shared data (ready queue), so be sure to use proper synchronization
@@ -121,6 +122,7 @@ int main(int argc, char **argv)
                     // RR
                     if (shared_data->time_slice <= curTime - processes[i]->getBurstStartTime()) {
                         processes[i]->interrupt();
+                        std::cout << processes[i]->getPid()<<"--------Round Robin!!-------\n" << std::endl;
                     }
                 }
             }
@@ -240,7 +242,7 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
             // p is running now.
             uint64_t curTime = currentTime();
             p->setCpuCore(core_id);
-            p->setState(Process::State::Running, curTime);
+            p->setState(Process::State::Running, curTime); // set burst_start_time
             //   - Simulate the processes running until one of the following:
             //     - CPU burst time has elapsed
             if (curTime - p->getBurstStartTime() >= p->getBurstTimeOfGivenIndex(p->getIndexBurstTime())) {
@@ -274,7 +276,9 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                         shared_data->ready_queue.push_back(p);
                         p->setStartWaitingTime(curTime);
                         // modify the CPU burst time to now reflect the remaining time
-                        p->updateBurstTime(p->getIndexBurstTime(), p->getTimeSlice());
+                        p->updateBurstTime(p->getIndexBurstTime(), p->getBurstTimeOfGivenIndex(p->getIndexBurstTime())- p->getTimeSlice());
+                        std::cout << p->getPid()<<"--------Handled!!!-------\n" << std::endl;
+                        std::cout << p->getIndexBurstTime() << " ------silce: "<<p->getTimeSlice()<<"----- "<<p->getBurstTimeOfGivenIndex(p->getIndexBurstTime()) << std::endl;
                         p->setCpuCore(-1);
                         p = NULL;
                     } else if (shared_data->algorithm == ScheduleAlgorithm::PP) {

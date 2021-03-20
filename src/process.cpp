@@ -156,12 +156,8 @@ void Process::updateProcess(uint64_t current_time)
 
 void Process::updateBurstTime(int burst_idx, uint32_t new_time)
 {
-    // burst_times[burst_idx] = new_time;
-    burst_times[burst_idx] -= new_time;
-    if (burst_times[burst_idx] < 0) {
-        burst_times[burst_idx] = 0;
-    }
-
+    burst_times[burst_idx] = new_time;
+    
 }
 
 int Process::getIndexBurstTime() const
@@ -184,9 +180,9 @@ void Process::setStartWaitingTime(uint64_t current_time)
     start_waiting_time = current_time;
 }
 
-void Process::setTimeSlice(uint32_t time_slice)
+void Process::setTimeSlice(uint32_t slice)
 {
-    time_slice = time_slice;
+    time_slice = slice;
 }
 
 uint32_t Process::getTimeSlice() const

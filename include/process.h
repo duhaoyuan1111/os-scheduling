@@ -56,7 +56,7 @@ public:
     uint32_t getBurstTimeOfGivenIndex(int index);
     uint16_t getNumBursts() const;
     void setStartWaitingTime(uint64_t current_time);
-    void setTimeSlice(uint32_t time_slice);
+    void setTimeSlice(uint32_t slice);
     uint32_t getTimeSlice() const;
 };
 
