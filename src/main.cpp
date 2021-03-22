@@ -18,6 +18,7 @@ typedef struct SchedulerData {
     uint32_t context_switch;
     uint32_t time_slice;
     std::list<Process*> ready_queue;
+    std::list<Process*> terminated_queue;
     bool all_terminated;
 } SchedulerData;
 
@@ -66,6 +67,10 @@ int main(int argc, char **argv)
             p->setStartWaitingTime(currentTime());
         }
     }
+    // Statistics for half/second half od processes
+    int flag = 0;
+    double first_half_ave_throughput = 0.0;
+    double second_half_ave_throughput = 0.0;
     
     // Free configuration data from memory
     int num_processes = config->num_processes;
@@ -152,6 +157,16 @@ int main(int argc, char **argv)
                     }
                 }
             }
+            // calculate the first/second half processes statistics
+            if (shared_data->terminated_queue.size() >= num_processes/2 && flag == 0) {
+                std::list<Process*>::iterator iterTer = shared_data->terminated_queue.begin();
+                flag = 1; // only run once
+                while (iterTer != shared_data->terminated_queue.end()) {
+                    first_half_ave_throughput += (*iterTer)->getTurnaroundTime();
+                    iterTer++;
+                }
+            }
+
         }
         //- Determine if all processes are in the terminated state
         int counter = 0;
@@ -194,7 +209,11 @@ int main(int argc, char **argv)
     ave_turn_time = ave_turn_time/num_processes;
     ave_wait_time = ave_wait_time/num_processes;
     double CPU_utilization = 1.0 - total_percentage_wait_time/num_processes;
-
+    CPU_utilization = CPU_utilization * 100.0; // percentage
+    //- Average for first 50% of processes finished
+    first_half_ave_throughput = first_half_ave_throughput/(double)(num_processes/2);
+    //- Average for second 50% of processes finished
+    second_half_ave_throughput = ave_turn_time - first_half_ave_throughput;
     //  - CPU utilization
     //  - Throughput
     //     - Average for first 50% of processes finished
@@ -202,7 +221,7 @@ int main(int argc, char **argv)
     //     - Overall average
     //  - Average turnaround time
     //  - Average waiting time
-    printf("\nCPU utilization: %.1f\nAverage turnaround time: %.1f\nAverage waiting time: %.1f\n", CPU_utilization, ave_turn_time, ave_wait_time);
+    printf("\n - CPU utilization: \033[32m%.1f%%\033[0m\n - Throughput\n    - Average for first 50%% of processes finished: \033[32m%.1f seconds/process\033[0m\n    - Average for second 50%% of processes finished: \033[32m%.1f seconds/process\033[0m\n    - Overall average: \033[32m%.1f seconds/process\033[0m\n - Average turnaround time: \033[32m%.1f seconds\033[0m\n - Average waiting time: \033[32m%.1f seconds\033[0m\n", CPU_utilization, first_half_ave_throughput, second_half_ave_throughput, ave_turn_time, ave_turn_time, ave_wait_time);
 
 
     // Clean up before quitting program
@@ -224,8 +243,6 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
             const std::lock_guard<std::mutex> lock(shared_data->mutex);
             if (!shared_data->ready_queue.empty()) {
                 //   - *Get process at front of ready queue
-                
-                
                 uint64_t curTime = currentTime();
                 p = shared_data->ready_queue.front();
                 shared_data->ready_queue.pop_front();
@@ -259,6 +276,10 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
                     p->updateProcess(curTime);// update cpu_time && remain_time
                     p->setState(Process::State::Terminated, curTime);
                     p->setCpuCore(-1);
+                    { // calculate first/second half of processes later
+                        const std::lock_guard<std::mutex> lock(shared_data->mutex);
+                        shared_data->terminated_queue.push_back(p);
+                    }
                     // current process is over
                     p = NULL;
                 }
