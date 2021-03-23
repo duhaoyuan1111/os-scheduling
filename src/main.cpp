@@ -200,7 +200,7 @@ int main(int argc, char **argv)
     double ave_wait_time = 0.0;
     for (int i = 0; i < processes.size(); i++) {
         //  - CPU utilization
-        total_percentage_wait_time += processes[i]->getWaitTime()/processes[i]->getTurnaroundTime();
+        total_percentage_wait_time += processes[i]->getCpuTime()/processes[i]->getTurnaroundTime();
         //  - Average turnaround time
         ave_turn_time += processes[i]->getTurnaroundTime();
         //  - Average waiting time
